@@ -1,0 +1,68 @@
+version: '3'
+
+services:
+  web:
+    build: 
+      context: ./client
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - 80:80
+    networks:
+      - mynet
+  
+  db:
+    image: redis
+    restart: always
+    networks:
+      - mynet
+
+  api-server:
+    build: 
+      context: ./server
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - PORT=8080
+    networks:
+      - mynet
+    ports:
+      - 8080:8080
+    depends_on:
+      - db
+
+  worker:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    restart: always
+    networks:
+      - mynet
+    depends_on:
+      - db
+    command: rq worker --url redis://db:6379
+
+  stream-receiver:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - 4057:4057
+      - 5060:5060
+      - 5061:5061
+      - 7001:7001
+      - 7002:7002
+      - 8443:8443
+      - 20000-24999:20000-24999/tcp
+      - 20000-24999:20000-24999/udp
+      - 3478:3478
+    networks:
+      - mynet
+    depends_on:
+      - db
+      - api-server
+    command: python3 -m app.stream_receiver
+
+networks:
+  mynet:
